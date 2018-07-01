@@ -49,10 +49,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	// for k, v := range decryptM {
-	// 	fmt.Printf("%s ... %s\n", k, v)
-	// }
-
 	var encryptF encryptFunc
 	switch alg {
 	case "sha1":
@@ -70,13 +66,11 @@ func main() {
 
 	lines = lines[1:]
 	words := separateWords(concur, esh, lines)
-	//fmt.Printf("%v\n", wordLines)
 
 	// Process each word concurrently
 	// ==============================
 	//  => gather and present the file content
 	var wg sync.WaitGroup // wait for all word processing goroutines
-	//var wmu *sync.Mutex   // make structure storing found words goroutine safe
 
 	alphaConc := createLetterSlices(concur)
 	resultCh := make(chan result, len(words))
@@ -96,11 +90,9 @@ func main() {
 		}(wordPos, letterLines)
 	}
 
-	// Wait until all words are processed
-	fmt.Println("Waiting for word goroutines to finish")
+	// wait until all words are processed
 	wg.Wait()
 	close(resultCh)
-	fmt.Println("All word goroutines done")
 	//---------------------------------------------------------------
 
 	contentM := map[int]string{}
@@ -124,12 +116,12 @@ func checkError(err error) {
 	}
 }
 
-// separateWords puts lines denoting one word into separate slices to allow concurrent processing
+// separateWords puts lines denoting one word into separate slices to allow concurrent processing.
 func separateWords(n int, esh string, lines []string) map[int][]string {
 	wordLines := map[int][]string{}
 	wn := 0
 	for _, wl := range lines {
-		// empty line
+		// separate words on empty line
 		if wl == esh {
 			wn++
 			continue
@@ -140,7 +132,7 @@ func separateWords(n int, esh string, lines []string) map[int][]string {
 }
 
 // createLetterSlices segments the alphabet into several sub slices to allow concurrent
-// search
+// search.
 func createLetterSlices(n int) map[int][]string {
 	letterMap := make(map[int][]string)
 	alpha := "a b c d e f g h i j k l m n o p q r s t u v w x y z A B C D E F G H I J K L M N O P Q R S T U V W X Y Z"
@@ -207,7 +199,6 @@ func createDecryptMap(emptyString string) (string, map[string]string, error) {
 
 func encryptSHA1() encryptFunc {
 	return func(plaintext string) string {
-		//fmt.Printf("plaintext: %s - encrypted: %x\n\n", plaintext, sha1.Sum([]byte(plaintext)))
 		return fmt.Sprintf("%x", sha1.Sum([]byte(plaintext)))
 	}
 }
@@ -227,8 +218,8 @@ func encryptMD5() encryptFunc {
 	}
 }
 
-// processWord processes a slice of lines incrementally representing one word
-// eg:
+// processWord processes a slice of lines incrementally representing one word.
+// Eg:
 // h
 // ha
 // hap
