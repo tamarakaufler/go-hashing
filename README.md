@@ -30,4 +30,4 @@ go run main.go
 
 go run main.go -f test3.txt
 
-docker run --name=decrypt-incremental --rm -v $PWD:/data quay.io/tamarakaufler/decrypt-incremental:v1alpha1 --file=/data/some_file.txt 
+docker run --name=decrypt-incremental --rm -v $PWD:/data quay.io/tamarakaufler/decrypt-incremental:v1alpha1 -f=/data/some_file.txt
