@@ -23,4 +23,5 @@ Concurrency is used to speed up processing. Lines constituting a word are proces
 
 ## Usage
 go run main.go
+
 go run main.go -f test3.txt
