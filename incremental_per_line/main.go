@@ -18,11 +18,9 @@ import (
 var filename string
 var concur int
 
-type line struct {
-	previousDecrypted, nextEncrypted string
-	done                             chan struct{}
-	mu                               *sync.Mutex
-	wg                               *sync.WaitGroup
+type result struct {
+	pos  int
+	word string
 }
 
 type encryptFunc func(string) string
@@ -74,13 +72,16 @@ func main() {
 	words := separateWords(concur, esh, lines)
 	//fmt.Printf("%v\n", wordLines)
 
-	// Process each word concurrently => gather and present the file content
+	// Process each word concurrently
+	// ==============================
+	//  => gather and present the file content
 	var wg sync.WaitGroup // wait for all word processing goroutines
-	var wmu *sync.Mutex   // make structure storing found words goroutine safe
+	//var wmu *sync.Mutex   // make structure storing found words goroutine safe
 
 	alphaConc := createLetterSlices(concur)
-	contentM := map[int]string{}
+	resultCh := make(chan result, len(words))
 
+	//---------------------------------------------------------------
 	for wordPos, letterLines := range words {
 		wg.Add(1)
 		go func(wordPos int, letterLines []string) {
@@ -89,10 +90,8 @@ func main() {
 			fmt.Printf("first letter = %v\n", firstLetter)
 
 			processWord(
-				wmu, wordPos, contentM,
+				wordPos, resultCh,
 				encryptF, alphaConc, firstLetter, letterLines[1:])
-
-			fmt.Printf("%v\n", contentM)
 
 		}(wordPos, letterLines)
 	}
@@ -100,9 +99,17 @@ func main() {
 	// Wait until all words are processed
 	fmt.Println("Waiting for word goroutines to finish")
 	wg.Wait()
+	close(resultCh)
 	fmt.Println("All word goroutines done")
+	//---------------------------------------------------------------
 
+	contentM := map[int]string{}
 	content := []string{}
+
+	for res := range resultCh {
+		fmt.Printf("\nResult %#v\n\n", res)
+		contentM[res.pos] = res.word
+	}
 	for i := 0; i < len(contentM); i++ {
 		content = append(content, contentM[i])
 	}
@@ -220,86 +227,89 @@ func encryptMD5() encryptFunc {
 	}
 }
 
-// processWord processes a slice of lines representing one word
-//
-// go processWord(
-// 	wmu, wordPos, contentM,
-//  encryptF, alphaConc, firstLetter, letterLines)
-func processWord(wmu *sync.Mutex, wordPos int, contentM map[int]string,
+// processWord processes a slice of lines incrementally representing one word
+// eg:
+// h
+// ha
+// hap
+// happ
+// happy
+func processWord(wordPos int, resultCh chan result,
 	encryptF encryptFunc, alphaConc map[int][]string, firstLetter string, wordLines []string) {
 
-	// when one goroutine decrypts then this subroutine sends a message to the done channel
+	// when one goroutine decrypts then this subroutine sends a message to the decypheredCh channel
 	// for the rest of the goroutines to receive and return
 	//decypheredCh := make(chan struct{}, len(alphaConc)-1)
+
 	decryptedCh := make(chan string, 1)
 
 	decrypted := firstLetter
 	concCount := len(alphaConc)
-	done := make(chan struct{}, concCount-1)
+	done := make(chan struct{}, concCount)
 
-	// ll is the original encrypted line content
-	for _, encrypted := range wordLines {
+	// encrypted is the original encrypted line content
+	lastLineIdx := len(wordLines) - 1
+	for lineIdx := 0; lineIdx <= lastLineIdx; lineIdx++ {
 
-		fmt.Printf("Decrypting [%s]\n", encrypted)
+		fmt.Printf("\n==> processWord: processing line %d\n", lineIdx)
+
 		var wg sync.WaitGroup
+		encryptedLine := wordLines[lineIdx]
+		fmt.Printf("Decrypting [%s, %d]\n", encryptedLine, lastLineIdx)
 
+		// concurrent processing of one line witnin the slice of lines representing a word
 		for i, letters := range alphaConc {
 			fmt.Printf("Processing %d [%#v]\n", i, letters)
 
 			wg.Add(1)
 			go func(letters []string) {
 				defer wg.Done()
-				decipherLine(done, decryptedCh, concCount, encryptF, letters, decrypted, encrypted)
+				decipherLine(done, decryptedCh, concCount, encryptF, letters, decrypted, encryptedLine)
 
-				fmt.Printf("Leaving [%d]\n", i)
+				//fmt.Printf("Leaving [%d]\n", i)
 			}(letters)
 		}
 
-		fmt.Println("Waiting for line goroutines")
 		wg.Wait()
-		fmt.Println("Line goroutines finished")
+		// decrypted = <-decryptedCh
+		// fmt.Printf(">>> RECEIVED decrypted line within the word = %s\n", decrypted)
 
-		for {
-			fmt.Println("waiting for decrypted\n")
-			select {
-			case decrypted = <-decryptedCh:
-				fmt.Printf("decrypted = %s\n", decrypted)
-				break
-			case <-time.After(1 * time.Second):
-				fmt.Println("waiting for decrypted timed out\n")
-				return
-			}
+		fmt.Println("waiting to receive from decryptedCh representing partial word\n")
+		select {
+		case decrypted = <-decryptedCh:
+			fmt.Printf(">>> RECEIVED decrypted line within the word = %s\n", decrypted)
+
+		case <-time.After(3 * time.Second):
+			// needs improving to avoid resource leaks
+			fmt.Println("Waiting for decrypted timed out\n")
+			close(decryptedCh)
+
+			return
 		}
 
+		if lineIdx == lastLineIdx {
+			close(decryptedCh)
+			resultCh <- result{
+				pos:  wordPos,
+				word: decrypted,
+			}
+		}
 	}
-	wmu.Lock()
-	contentM[wordPos] = decrypted
-	fmt.Printf("contentM = %v\n", contentM)
-	wmu.Unlock()
+
 }
 
 // decipherLine finds the decrypted content on the line.
 // This is done concurrently.
 func decipherLine(done chan struct{}, decryptedCh chan string, concCount int, encryptF encryptFunc, letters []string, decrypted string, encrypted string) {
-	goCount := concCount - 1
-
+	//fmt.Printf("In decipherLine: decrypted = %s; %#v\n", decrypted, letters)
 	for _, l := range letters {
 		trial := decrypted + l
-
-		select {
-		case <-done:
+		//fmt.Printf("\tIn decipherLine: trial: %s ... got: %s - need %s\n", trial, encryptF(trial), encrypted)
+		if encryptF(trial) == encrypted {
+			fmt.Printf("\t\tIn decipherLine: SENDING [%s] using %s and %v \n", trial, decrypted, letters)
+			decryptedCh <- trial
 			return
-		default:
-			// found the right letter, so close the other worker goroutines
-			// and send the found solution
-			if encryptF(trial) == encrypted {
-				for i := 1; i <= goCount; i++ {
-					done <- struct{}{}
-				}
-				decryptedCh <- trial
-				return
-			}
-			trial = decrypted
 		}
+		trial = decrypted
 	}
 }
