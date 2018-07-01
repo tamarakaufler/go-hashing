@@ -18,10 +18,9 @@ Find content of a file with content encrypted with an unknown hash function. The
  - world
  - empty line (optional)
 
-
-
+## Implementation
+Concurrency is used to speed up processing. Lines constituting a word are processed concurrently, as is decryption of individual lines. The alphabet and additional symbols are split into several string slices, which are then processed in parallel, trying to find the letter/symbol, that, when added to the previously decryped ones, matches the line hash.
 
 ## Usage
-
 go run main.go
 go run main.go -f test3.txt
