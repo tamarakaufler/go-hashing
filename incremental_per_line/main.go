@@ -255,8 +255,6 @@ func processWord(wordPos int, resultCh chan result,
 			}(letters)
 		}
 
-		wg.Wait()
-
 		//fmt.Println("waiting to receive from decryptedCh representing partial word\n")
 		select {
 		case decrypted = <-decryptedCh:
@@ -265,11 +263,14 @@ func processWord(wordPos int, resultCh chan result,
 		case <-time.After(3 * time.Second):
 			fmt.Printf(">>> Word timeout. The last received: %s\n", decrypted)
 			close(decryptedCh)
-
 			return
 		}
 
 		if lineIdx == lastLineIdx {
+			for i := 0; i < concCount; i++ {
+				done <- struct{}{}
+			}
+
 			close(decryptedCh)
 			resultCh <- result{
 				pos:  wordPos,
@@ -282,12 +283,20 @@ func processWord(wordPos int, resultCh chan result,
 
 // decipherLine decrypts a line.
 func decipherLine(done chan struct{}, decryptedCh chan string, concCount int, encryptF encryptFunc, letters []string, decrypted string, encrypted string) {
+	var trial string
 	for _, l := range letters {
-		trial := decrypted + l
-		if encryptF(trial) == encrypted {
-			fmt.Printf("\t\tIn decipherLine: SENDING [%s] using %s and %v \n", trial, decrypted, letters)
-			decryptedCh <- trial
+
+		select {
+		case <-done:
+			fmt.Printf("In decipherLine - CANCELLED (%s, %v)\n", decrypted, letters)
 			return
+		default:
+			trial = decrypted + l
+			if encryptF(trial) == encrypted {
+				fmt.Printf("\t\tIn decipherLine: SENDING [%s] using %s and %v \n", trial, decrypted, letters)
+				decryptedCh <- trial
+				return
+			}
 		}
 		trial = decrypted
 	}
