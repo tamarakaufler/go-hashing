@@ -107,7 +107,7 @@ func main() {
 	for i := 0; i < len(contentM); i++ {
 		content = append(content, contentM[i])
 	}
-	fmt.Printf("File content: %s\n", strings.Join(content, " "))
+	fmt.Printf("\nFile content: %s\n\n", strings.Join(content, " "))
 	fmt.Printf("Decryption took %s\n", time.Since(start))
 }
 
