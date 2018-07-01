@@ -237,13 +237,8 @@ func encryptMD5() encryptFunc {
 func processWord(wordPos int, resultCh chan result,
 	encryptF encryptFunc, alphaConc map[int][]string, firstLetter string, wordLines []string) {
 
-	// when one goroutine decrypts then this subroutine sends a message to the decypheredCh channel
-	// for the rest of the goroutines to receive and return
-	//decypheredCh := make(chan struct{}, len(alphaConc)-1)
-
-	decryptedCh := make(chan string, 1)
-
 	decrypted := firstLetter
+	decryptedCh := make(chan string, 1)
 	concCount := len(alphaConc)
 	done := make(chan struct{}, concCount)
 
@@ -265,14 +260,10 @@ func processWord(wordPos int, resultCh chan result,
 			go func(letters []string) {
 				defer wg.Done()
 				decipherLine(done, decryptedCh, concCount, encryptF, letters, decrypted, encryptedLine)
-
-				//fmt.Printf("Leaving [%d]\n", i)
 			}(letters)
 		}
 
 		wg.Wait()
-		// decrypted = <-decryptedCh
-		// fmt.Printf(">>> RECEIVED decrypted line within the word = %s\n", decrypted)
 
 		fmt.Println("waiting to receive from decryptedCh representing partial word\n")
 		select {
@@ -280,8 +271,6 @@ func processWord(wordPos int, resultCh chan result,
 			fmt.Printf(">>> RECEIVED decrypted line within the word = %s\n", decrypted)
 
 		case <-time.After(3 * time.Second):
-			// needs improving to avoid resource leaks
-			fmt.Println("Waiting for decrypted timed out\n")
 			close(decryptedCh)
 
 			return
@@ -298,13 +287,10 @@ func processWord(wordPos int, resultCh chan result,
 
 }
 
-// decipherLine finds the decrypted content on the line.
-// This is done concurrently.
+// decipherLine decrypts a line.
 func decipherLine(done chan struct{}, decryptedCh chan string, concCount int, encryptF encryptFunc, letters []string, decrypted string, encrypted string) {
-	//fmt.Printf("In decipherLine: decrypted = %s; %#v\n", decrypted, letters)
 	for _, l := range letters {
 		trial := decrypted + l
-		//fmt.Printf("\tIn decipherLine: trial: %s ... got: %s - need %s\n", trial, encryptF(trial), encrypted)
 		if encryptF(trial) == encrypted {
 			fmt.Printf("\t\tIn decipherLine: SENDING [%s] using %s and %v \n", trial, decrypted, letters)
 			decryptedCh <- trial
