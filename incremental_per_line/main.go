@@ -101,14 +101,14 @@ func main() {
 	content := []string{}
 
 	for res := range resultCh {
-		fmt.Printf("\nResult %#v\n\n", res)
+		// fmt.Printf("\nResult %#v\n\n", res)
 		contentM[res.pos] = res.word
 	}
 	for i := 0; i < len(contentM); i++ {
 		content = append(content, contentM[i])
 	}
 	fmt.Printf("File content: %s\n", strings.Join(content, " "))
-	fmt.Printf("Took %s\n", time.Since(start))
+	fmt.Printf("Decryption took %s\n", time.Since(start))
 }
 
 func checkError(err error) {
@@ -245,8 +245,8 @@ func processWord(wordPos int, resultCh chan result,
 		fmt.Printf("Decrypting [%s, %d]\n", encryptedLine, lastLineIdx)
 
 		// concurrent processing of one line witnin the slice of lines representing a word
-		for i, letters := range alphaConc {
-			fmt.Printf("Processing %d [%#v]\n", i, letters)
+		for _, letters := range alphaConc {
+			//fmt.Printf("Processing %d [%#v]\n", i, letters)
 
 			wg.Add(1)
 			go func(letters []string) {
@@ -257,12 +257,13 @@ func processWord(wordPos int, resultCh chan result,
 
 		wg.Wait()
 
-		fmt.Println("waiting to receive from decryptedCh representing partial word\n")
+		//fmt.Println("waiting to receive from decryptedCh representing partial word\n")
 		select {
 		case decrypted = <-decryptedCh:
 			fmt.Printf(">>> RECEIVED decrypted line within the word = %s\n", decrypted)
 
 		case <-time.After(3 * time.Second):
+			fmt.Printf(">>> Word timeout. The last received: %s\n", decrypted)
 			close(decryptedCh)
 
 			return
