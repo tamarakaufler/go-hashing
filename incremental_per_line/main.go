@@ -72,7 +72,8 @@ func main() {
 	//  => gather and present the file content
 	var wg sync.WaitGroup // wait for all word processing goroutines
 
-	alphaConc := createLetterSlices(concur)
+	alpha := "a b c d e f g h i j k l m n o p q r s t u v w x y z A B C D E F G H I J K L M N O P Q R S T U V W X Y Z ' 0 1 2 3 4 5 6 7 8 9"
+	alphaConc := createLetterSlices(alpha, concur)
 	resultCh := make(chan result, len(words))
 
 	//---------------------------------------------------------------
@@ -90,7 +91,8 @@ func main() {
 		}(wordPos, letterLines)
 	}
 
-	// wait until all words are processed
+	// Wait until all words are processed.
+	// Under the hood, this means processing all encrypted lines associated with a word. This is done in parallel too, splitting the alphabet search over several goroutines.
 	wg.Wait()
 	close(resultCh)
 	//---------------------------------------------------------------
@@ -133,9 +135,8 @@ func separateWords(n int, esh string, lines []string) map[int][]string {
 
 // createLetterSlices segments the alphabet into several sub slices to allow concurrent
 // search.
-func createLetterSlices(n int) map[int][]string {
+func createLetterSlices(alpha string, n int) map[int][]string {
 	letterMap := make(map[int][]string)
-	alpha := "a b c d e f g h i j k l m n o p q r s t u v w x y z A B C D E F G H I J K L M N O P Q R S T U V W X Y Z"
 	alphaList := strings.Split(alpha, " ")
 
 	alphaListLen := len(alphaList)

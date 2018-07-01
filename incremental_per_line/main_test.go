@@ -8,7 +8,8 @@ import (
 
 func Test_createLetterSlices(t *testing.T) {
 	type args struct {
-		n int
+		alpha string
+		n     int
 	}
 	tests := []struct {
 		name string
@@ -18,7 +19,8 @@ func Test_createLetterSlices(t *testing.T) {
 		{
 			name: "Split into 4 batches",
 			args: args{
-				n: 4,
+				alpha: "a b c d e f g h i j k l m n o p q r s t u v w x y z A B C D E F G H I J K L M N O P Q R S T U V W X Y Z",
+				n:     4,
 			},
 			want: map[int][]string{
 				0: []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m"},
@@ -30,7 +32,8 @@ func Test_createLetterSlices(t *testing.T) {
 		{
 			name: "Split into 5 batches",
 			args: args{
-				n: 5,
+				alpha: "a b c d e f g h i j k l m n o p q r s t u v w x y z A B C D E F G H I J K L M N O P Q R S T U V W X Y Z",
+				n:     5,
 			},
 			want: map[int][]string{
 				0: []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j"},
@@ -44,7 +47,7 @@ func Test_createLetterSlices(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := createLetterSlices(tt.args.n); !reflect.DeepEqual(got, tt.want) {
+			if got := createLetterSlices(tt.args.alpha, tt.args.n); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("createLetterSlices() = %v, want %v", got, tt.want)
 			}
 		})
